@@ -20,9 +20,11 @@
             d3 = $window.d3;
 
             // Set the dimensions of the canvas / graph
-            var margin = {top: 30, right: 20, bottom: 30, left: 50},
-                width = 500 - margin.left - margin.right,
-                height = 200 - margin.top - margin.bottom;
+            var margin = {top: 5, right: 20, bottom: 100, left: 15},
+                margin2 = {top: 220, right: 20, bottom: 30, left: 15},
+                width = 600 - margin.left - margin.right,
+                height = 300 - margin.top - margin.bottom,
+                height2 = 300 - margin2.top - margin2.bottom;
 
             // Parse the date / time
             var parseDate = d3.time.format("%d/%m/%Y").parse,
@@ -36,20 +38,31 @@
             ]);
 
             // Set the ranges
-            var x = d3.time.scale().range([0, width]);
-            var y = d3.scale.linear().range([height, 0]);
+            var
+              x  = d3.time.scale().range([0, width]),
+              x2 = d3.time.scale().range([0, width]),
+              y  = d3.scale.linear().range([height, 0]),
+              y2 = d3.scale.linear().range([height2, 0]);
 
             // Define the axes
+            var
+              xAxis  = d3.svg.axis().scale(x).orient("bottom").ticks(5),
+              xAxis2 = d3.svg.axis().scale(x2).orient("bottom"),
+              yAxis  = d3.svg.axis().scale(y).orient("left").ticks(2);
 
-            var yAxis = d3.svg.axis()
-                .scale(y)
-                .orient("left")
-                .ticks(2);
+            var brush = d3.svg.brush().x(x2).on("brush", function() {
+              x.domain(brush.empty() ? x2.domain() : brush.extent());
+              focus.select(".time-graph-path.line").attr("d", valueline);
+              focus.select(".x.axis").call(xAxis);
+            });
 
             // Define the line
             var valueline = d3.svg.line()
                 .x(function(d) { return x(d.date); })
                 .y(function(d) { return y(d.close); });
+            var valueline2 = d3.svg.line()
+                .x(function(d) { return x2(d.date); })
+                .y(function(d) { return y2(d.close); });
 
             // Define the div for the tooltip
             var div = d3.select(element[0]).append("div")
@@ -65,29 +78,46 @@
                   'width': '100%',
                   'class': 'time-graph'})
                 .append("g")
-                    .attr("transform",
-                          "translate(" + margin.left + "," + margin.top + ")");
+                  .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-            var lineSvg = svg.append("g")
-              .append("path")
+            svg.append("defs").append("clipPath")
+              .attr("id", "clip")
+            .append("rect")
+              .attr("width", width)
+              .attr("height", height);
+
+            var focus = svg.append("g")
+              .attr("class", "focus")
+              .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+            var context = svg.append("g")
+                .attr("class", "context")
+                .attr("transform", "translate(" + margin2.left + "," + margin2.top + ")");
+
+            var lineSvg = focus.append("path")
               .attr("class", "time-graph-path line");
-            var xAxisSvg = svg.append("g")
+            var xAxisSvg = focus.append("g")
                 .attr("class", "x axis")
                 .attr("transform", "translate(0," + height + ")");
-            var yAxisSvg = svg.append("g")
+            var yAxisSvg = focus.append("g")
                 .attr("class", "y axis");
-            var line100PercSVG = svg.append("line")
+            var line100PercSVG = focus.append("line")
               .attr("class", "time-graph-path limit-line");
-            var focus = svg.append("g")
-                .style("display", "none");
-            focus.append("circle")
+            var circle = focus.append("circle")
                 .attr("class", "time-graph-dot y")
                 .attr("r", 4);
-            var rectMouse = svg.append("rect")
+            var rectMouse = focus.append("rect")
                 .attr("width", width)
                 .attr("height", height)
                 .style("fill", "none")
                 .style("pointer-events", "all");
+
+            var line2Svg = context.append("path")
+              .attr("class", "time-graph-path line");
+            context.append("g")
+              .attr("class", "x axis")
+              .attr("transform", "translate(0," + height2 + ")")
+              .call(xAxis2);
 
             scope.$watch(function(scope) { return scope.monitoramento }, function(newValue, oldValue) {
               if (typeof newValue != 'undefined') {
@@ -141,15 +171,12 @@
 
               x.domain(extent);
               y.domain([0, max]);
-
-              var xAxis = d3.svg.axis()
-                .scale(x)
-                .orient("bottom")
-                .ticks(getTimeScaleTicksUnit(months), getTimeScaleTicksInterval(months))
-                .tickFormat(customTimeFormat);
+              x2.domain(extent);
+              y2.domain([0, max]);
 
               // Add the valueline path.
               lineSvg.attr("d", valueline(data));
+              line2Svg.attr("d", valueline2(data));
               // Add the X Axis
               xAxisSvg.call(xAxis);
               // Add the Y Axis
@@ -157,9 +184,9 @@
               // Add 100% line
               line100PercSVG.attr({"x1": 0, "y1": y(100), "x2": width, "y2": y(100)});
 
-              // append the rectangle to capture mouse
+              // Append the rectangle to capture mouse
               rectMouse
-                  .on("mouseover", function() { focus.style("display", null); })
+                  .on("mouseover", function() { circle.style("display", null); })
                   .on("mouseout", mouseout)
                   .on("mousemove", mousemove);
 
@@ -184,7 +211,7 @@
             	}
 
               function mouseout() {
-                focus.style("display", "none");
+                circle.style("display", "none");
                 div.style("display", "none");
               }
 
@@ -218,6 +245,8 @@
                 return 2;
               };
             }
+
+
 
           }
         }
